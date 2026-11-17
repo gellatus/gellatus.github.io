@@ -40,7 +40,7 @@ svg{display:block}
 .perfil h1{font-family:var(--serif);font-weight:700;font-size:34px;letter-spacing:-.01em;color:var(--marrom);margin-top:14px;line-height:1.15}
 .perfil .sub{font-size:11.5px;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--laranja-esc);margin-top:6px}
 .perfil .bio{color:var(--cinza);margin:12px auto 0;max-width:380px;font-size:15px}
-.selos{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 18px;margin-top:16px;font-size:12.5px;font-weight:500;color:var(--marrom)}
+.selos{display:flex;justify-content:center;flex-wrap:nowrap;white-space:nowrap;gap:clamp(7px,2.4vw,18px);margin-top:16px;font-size:12.5px;font-weight:500;color:var(--marrom)}
 .selos span{display:inline-flex;align-items:center;gap:6px}
 .selos svg{width:15px;height:15px;color:var(--laranja)}
 
@@ -209,7 +209,7 @@ svg{display:block}
   .opcoes{grid-template-columns:1fr 1fr 1fr}
   .lista-simples{columns:3}
 }
-@media (max-width:420px){.pc span{font-size:10.5px;letter-spacing:.08em;white-space:nowrap}.pc b{font-size:23px;gap:7px}.placa-in{padding:18px 10px 16px}}
+@media (max-width:420px){.selos{font-size:min(12px,2.95vw)}.selos span{gap:4px}.selos svg{width:min(14px,3.4vw);height:min(14px,3.4vw)}.pc span{font-size:10.5px;letter-spacing:.08em;white-space:nowrap}.pc b{font-size:23px;gap:7px}.placa-in{padding:18px 10px 16px}}
 @media (min-width:700px){
   .links{display:grid;grid-template-columns:1fr 1fr;gap:12px}
   .btn.principal{grid-column:1/-1}
