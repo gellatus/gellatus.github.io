@@ -192,6 +192,24 @@ svg{display:block}
 .lp-edit:hover{background:var(--laranja-sut)}
 .lp-menos{width:34px;height:34px;border-radius:50%;border:1.5px solid var(--laranja);color:var(--laranja-esc);display:grid;place-items:center}
 .lp-menos svg{width:15px;height:15px;stroke-width:2.2}
+.gps-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;border:1.5px dashed var(--laranja);background:var(--laranja-sut);color:var(--laranja-esc);font-weight:600;font-size:14.5px;border-radius:10px;padding:12px;transition:background .15s}
+.gps-btn[hidden]{display:none}
+.gps-btn:hover{background:#F8DFD2}
+.gps-btn:disabled{opacity:.7;cursor:wait}
+.gps-btn .ico{width:19px;height:19px}
+.gps-btn.carregando .ico{animation:gira 1s linear infinite}
+.gps-ok{display:flex;align-items:center;gap:10px;border:1px solid #BFE3CC;background:#EEF8F2;border-radius:10px;padding:10px 12px}
+.gps-ok[hidden]{display:none}
+.gps-ic{width:34px;height:34px;border-radius:50%;background:#16A34A;color:#fff;display:grid;place-items:center;flex-shrink:0}
+.gps-ic .ico{width:17px;height:17px}
+.gps-info{flex:1;min-width:0;line-height:1.3}
+.gps-info b{display:block;font-size:14px;font-weight:600;color:#13773D}
+.gps-info small{display:block;font-size:12px;color:var(--cinza);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gps-info small.baixa{color:#B45309;white-space:normal}
+.gps-ok a,.gps-ok button{font-size:13px;font-weight:600;color:var(--laranja-esc);padding:6px 4px;flex-shrink:0}
+.gps-ok button{color:var(--cinza)}
+.gps-dica{font-size:12px;color:var(--cinza);margin-top:6px;line-height:1.45}
+@keyframes gira{to{transform:rotate(360deg)}}
 .campo-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .pix{display:flex;align-items:center;gap:10px;margin-top:10px;background:var(--fundo);border:1px dashed #DCC9BD;border-radius:10px;padding:10px 12px;font-size:13.5px}
 .pix[hidden]{display:none}
@@ -321,6 +339,7 @@ svg{display:block}
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6-7-11.5a7 7 0 0 1 14 0C19 15 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.2l2.4 2.4 4.6-4.8"/></symbol>
   <symbol id="i-relogio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-alvo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-mais" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
   <symbol id="i-menos" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
@@ -460,6 +479,17 @@ svg{display:block}
       </div>
       <div class="campo"><label for="f-nome">Nome</label><input id="f-nome" maxlength="60" autocomplete="name" placeholder="Seu nome"></div>
       <div id="c-end">
+        <div class="campo gps">
+          <label>Localização para entrega</label>
+          <button type="button" class="gps-btn" id="gps-btn" onclick="pegarLocalizacao()"><svg class="ico"><use href="#i-alvo"/></svg><span id="gps-btn-tx">Enviar minha localização (GPS)</span></button>
+          <div class="gps-ok" id="gps-ok" hidden>
+            <span class="gps-ic"><svg class="ico"><use href="#i-pin"/></svg></span>
+            <div class="gps-info"><b>Localização adicionada</b><small id="gps-tx"></small></div>
+            <a id="gps-ver" href="#" target="_blank" rel="noopener">Ver</a>
+            <button type="button" onclick="removerLocalizacao()">Remover</button>
+          </div>
+          <p class="gps-dica" id="gps-dica">Opcional. O link do Google Maps vai junto no pedido e ajuda o entregador a chegar mais rápido.</p>
+        </div>
         <div class="campo"><label for="f-end">Endereço</label><input id="f-end" maxlength="120" autocomplete="street-address" placeholder="Rua e número"></div>
         <div class="campo-2">
           <div class="campo"><label for="f-bairro">Bairro</label><input id="f-bairro" maxlength="60" autocomplete="address-level3" placeholder="Bairro"></div>
@@ -810,6 +840,36 @@ function renderPedido(){
   $('ped-total').textContent=R(carrinho.reduce((a,b)=>a+b.q*b.p,0));
 }
 function editarItem(k){abrirMontar(null,k)}
+
+/* ---------- LOCALIZAÇÃO POR GPS ---------- */
+let gps=null; // {lat,lng,acc} — não é salvo no aparelho
+function linkMaps(g){return 'https://www.google.com/maps?q='+g.lat+','+g.lng}
+function mostrarGps(){
+  const tem=!!gps;
+  $('gps-btn').hidden=tem; $('gps-ok').hidden=!tem;
+  if(!tem) return;
+  const baixa=gps.acc>150;
+  $('gps-tx').textContent = baixa ? 'Precisão baixa (±'+gps.acc+' m). Preencha também o endereço.' : 'Precisão de ±'+gps.acc+' m';
+  $('gps-tx').classList.toggle('baixa',baixa);
+  $('gps-ver').href=linkMaps(gps);
+}
+function pegarLocalizacao(){
+  if(!('geolocation' in navigator)){toast('Seu navegador não permite enviar a localização');return}
+  const b=$('gps-btn'); b.disabled=true; b.classList.add('carregando'); $('gps-btn-tx').textContent='Obtendo localização…';
+  const fim=()=>{b.disabled=false;b.classList.remove('carregando');$('gps-btn-tx').textContent='Enviar minha localização (GPS)'};
+  navigator.geolocation.getCurrentPosition(p=>{
+    fim();
+    const lat=Number(p.coords.latitude), lng=Number(p.coords.longitude), acc=Math.round(Number(p.coords.accuracy)||0);
+    if(!isFinite(lat)||!isFinite(lng)||Math.abs(lat)>90||Math.abs(lng)>180){toast('Não foi possível obter a localização');return}
+    gps={lat:+lat.toFixed(6),lng:+lng.toFixed(6),acc};
+    mostrarGps(); toast('Localização adicionada ao pedido'); track('gps');
+  },err=>{
+    fim();
+    const msg={1:'Permissão negada. Ative a localização do navegador para este site.',2:'Localização indisponível. Verifique se o GPS está ligado.',3:'Demorou demais. Tente novamente em local aberto.'}[err.code]||'Não foi possível obter a localização';
+    toast(msg);
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:30000});
+}
+function removerLocalizacao(){gps=null;mostrarGps()}
 function esquecerDados(){
   try{localStorage.removeItem('gell_cliente')}catch(e){}
   ['f-nome','f-end','f-bairro','f-ref','f-troco','f-obs'].forEach(id=>$(id).value='');
@@ -827,8 +887,8 @@ function enviarPedido(){
   if(!carrinho.length){toast('Seu pedido está vazio');return}
   const nome=limpa($('f-nome').value,60), end=limpa($('f-end').value,120), bairro=limpa($('f-bairro').value,60), ref=limpa($('f-ref').value,120);
   if(!nome){toast('Informe seu nome');$('f-nome').focus();return}
-  if(entrega==='Delivery'&&!end){toast('Informe o endereço de entrega');$('f-end').focus();return}
-  if(entrega==='Delivery'&&!bairro){toast('Informe o bairro');$('f-bairro').focus();return}
+  if(entrega==='Delivery'&&!gps&&!end){toast('Informe o endereço ou envie sua localização');$('f-end').focus();return}
+  if(entrega==='Delivery'&&!gps&&!bairro){toast('Informe o bairro');$('f-bairro').focus();return}
   store.set('gell_cliente',{nome,end,bairro,ref,pag:$('f-pag').value,entrega});
   entrega = entrega==='Retirada'?'Retirada':'Delivery';
   const total=carrinho.reduce((a,b)=>a+b.q*b.p,0);
@@ -838,8 +898,10 @@ function enviarPedido(){
   m+=`*Nome:* ${nome}\n`;
   m+=`*Recebimento:* ${entrega==='Delivery'?'Delivery':'Retirada na loja'}\n`;
   if(entrega==='Delivery'){
-    m+=`*Endereço:* ${end}\n*Bairro:* ${bairro}\n`;
+    if(end) m+=`*Endereço:* ${end}\n`;
+    if(bairro) m+=`*Bairro:* ${bairro}\n`;
     if(ref) m+=`*Referência:* ${ref}\n`;
+    if(gps) m+=`*Localização (GPS):* ${linkMaps(gps)}\n`;
   }
   m+=`*Pagamento:* ${['Pix','Cartão (crédito/débito)','Dinheiro'].includes($('f-pag').value)?$('f-pag').value:'A combinar'}`;
   const pag=['Pix','Cartão (crédito/débito)','Dinheiro'].includes($('f-pag').value)?$('f-pag').value:'A combinar';
