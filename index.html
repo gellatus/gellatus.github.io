@@ -6,6 +6,8 @@
 <title>Gellatu's · Sorvete Artesanal · Tucano-BA</title>
 <meta name="description" content="Sorveteria Gellatu's em Tucano-BA. Sorvetes, açaí e doces artesanais, sem corantes, conservantes e saborizantes. Cardápio, delivery e localização.">
 <meta name="theme-color" content="#E8622C">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://gc.zgo.at; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https://gellatus.goatcounter.com; connect-src https://gellatus.goatcounter.com; frame-src https://www.google.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="strict-origin-when-cross-origin">
 <meta property="og:title" content="Gellatu's · Sorvete Artesanal">
 <meta property="og:description" content="Feito à mão, com amor. Sorvete, açaí e confeitaria. Cardápio e pedidos pelo WhatsApp.">
 <meta property="og:type" content="website">
@@ -194,7 +196,8 @@ svg{display:block}
 .pix span{color:var(--cinza)}
 .pix b{flex:1;font-weight:600;word-break:break-all}
 .pix button{color:var(--laranja-esc);font-weight:600;font-size:13px;padding:6px 8px}
-.lembrar{font-size:12px;color:var(--cinza);margin-top:12px}
+.lembrar{font-size:12px;color:var(--cinza);margin-top:12px;line-height:1.5}
+.esquecer{color:var(--laranja-esc);font-weight:600;font-size:12px;text-decoration:underline;padding:2px 0}
 .info-sab{margin-top:44px;padding-top:6px;border-top:1px solid var(--linha)}
 .info-sab>.sec-t{font-size:20px}
 .info-sab .sec{padding-top:18px}
@@ -415,7 +418,7 @@ svg{display:block}
       </div>
       <div class="busca">
         <svg class="ico"><use href="#i-busca"/></svg>
-        <input id="busca" type="search" placeholder="Buscar no cardápio" autocomplete="off">
+        <input id="busca" type="search" maxlength="40" placeholder="Buscar no cardápio" autocomplete="off">
       </div>
       <div class="abas" id="abas" role="tablist"></div>
     </div>
@@ -453,21 +456,21 @@ svg{display:block}
           <button data-v="Retirada">Retirar na loja</button>
         </div>
       </div>
-      <div class="campo"><label for="f-nome">Nome</label><input id="f-nome" autocomplete="name" placeholder="Seu nome"></div>
+      <div class="campo"><label for="f-nome">Nome</label><input id="f-nome" maxlength="60" autocomplete="name" placeholder="Seu nome"></div>
       <div id="c-end">
-        <div class="campo"><label for="f-end">Endereço</label><input id="f-end" autocomplete="street-address" placeholder="Rua e número"></div>
+        <div class="campo"><label for="f-end">Endereço</label><input id="f-end" maxlength="120" autocomplete="street-address" placeholder="Rua e número"></div>
         <div class="campo-2">
-          <div class="campo"><label for="f-bairro">Bairro</label><input id="f-bairro" autocomplete="address-level3" placeholder="Bairro"></div>
-          <div class="campo"><label for="f-ref">Referência</label><input id="f-ref" placeholder="Opcional"></div>
+          <div class="campo"><label for="f-bairro">Bairro</label><input id="f-bairro" maxlength="60" autocomplete="address-level3" placeholder="Bairro"></div>
+          <div class="campo"><label for="f-ref">Referência</label><input id="f-ref" maxlength="120" placeholder="Opcional"></div>
         </div>
       </div>
       <div class="campo"><label for="f-pag">Pagamento</label>
         <select id="f-pag"><option>Pix</option><option>Cartão (crédito/débito)</option><option>Dinheiro</option></select>
       </div>
       <div class="pix" id="c-pix" hidden><span>Chave Pix</span><b id="pix-chave"></b><button type="button" onclick="copiarPix()">Copiar</button></div>
-      <div class="campo" id="c-troco" style="display:none"><label for="f-troco">Troco para</label><input id="f-troco" inputmode="decimal" placeholder="Ex.: 50,00"></div>
-      <div class="campo"><label for="f-obs">Observações</label><input id="f-obs" placeholder="Opcional"></div>
-      <p class="lembrar">Seu nome e endereço ficam salvos neste aparelho para o próximo pedido.</p>
+      <div class="campo" id="c-troco" style="display:none"><label for="f-troco">Troco para</label><input id="f-troco" maxlength="10" inputmode="decimal" placeholder="Ex.: 50,00"></div>
+      <div class="campo"><label for="f-obs">Observações</label><input id="f-obs" maxlength="200" placeholder="Opcional"></div>
+      <p class="lembrar">Seu nome e endereço ficam salvos apenas neste aparelho para o próximo pedido. <button type="button" class="esquecer" onclick="esquecerDados()">Apagar meus dados</button></p>
     </div>
     <div class="f-pe"><button class="btn-pri btn-zap" onclick="enviarPedido()"><svg class="ico"><use href="#i-zap"/></svg>Enviar pedido pelo WhatsApp</button></div>
   </div>
@@ -564,15 +567,53 @@ if(window.matchMedia('(min-width:960px)').matches && 'IntersectionObserver' in w
 }
 
 /* ---------- CARRINHO (salvo no aparelho) ---------- */
-let carrinho = store.get('gell_carrinho',[]);
-if(!Array.isArray(carrinho)) carrinho=[];
+/* Segurança: tudo que vem do armazenamento local é tratado como não confiável.
+   Cada item é reconstruído a partir do catálogo oficial (nome, preço e opções);
+   o que não corresponder a um item real é descartado. */
+const QTD_MAX = 50;
+function itemCatalogo(k){
+  const m=/^([a-z]+)-(\d{1,2})$/.exec(k); if(!m) return null;
+  const cat=CATS.find(c=>c.id===m[1]); if(!cat||cat.montar) return null;
+  const it=cat.itens[+m[2]]; return it ? it : null;
+}
+function normalizar(x){
+  if(!x||typeof x!=='object') return null;
+  const q=Math.min(QTD_MAX,Math.max(1,parseInt(x.q,10)||1));
+  const k=String(x.k||'');
+  if(/^m\d{1,6}$/.test(k)){
+    const c=x.cfg||{}; const tam=parseInt(c.tam,10);
+    const base=BASES.some(b=>b[0]===c.base)?c.base:null;
+    if(!(tam>=0&&tam<TAMANHOS.length)||!base) return null;
+    const mx=base==='Sorvete'?3:2;
+    const sab=[...new Set((Array.isArray(c.sab)?c.sab:[]).filter(v=>SABORES.includes(v)))].slice(0,mx);
+    const comp=[...new Set((Array.isArray(c.comp)?c.comp:[]).filter(v=>COMPLEMENTOS.includes(v)))].slice(0,3);
+    if(base==='Sorvete'&&!sab.length) return null;
+    const det=[]; if(sab.length)det.push('Sorvete: '+sab.join(', ')); if(comp.length)det.push('Complementos: '+comp.join(', '));
+    return {k,n:nomeBase(base)+' '+TAMANHOS[tam][0],p:TAMANHOS[tam][1],q,det:det.join(' · '),cfg:{tam,base,sab,comp}};
+  }
+  const [kb,sabor]=k.split('|');
+  const it=itemCatalogo(kb); if(!it) return null;
+  if(it.sab){
+    if(!SABORES.includes(sabor)) return null;
+    return {k:kb+'|'+sabor,n:it.n,p:it.p,q,det:'Sabor: '+sabor};
+  }
+  if(sabor!==undefined) return null;
+  return {k:kb,n:it.n,p:it.p,q};
+}
+function validarCarrinho(lista){return (Array.isArray(lista)?lista:[]).slice(0,60).map(normalizar).filter(Boolean)}
+let carrinho = validarCarrinho(store.get('gell_carrinho',[]));
 let seq = carrinho.reduce((m,i)=>Math.max(m, +(String(i.k).match(/^m(\d+)$/)||[0,0])[1]),0);
 function qtdDe(k){const i=carrinho.find(x=>x.k===k);return i?i.q:0}
 function addSimples(k,n,p){
   const i=carrinho.find(x=>x.k===k);
-  if(i)i.q++; else carrinho.push({k,n,p,q:1});
-  toast(n+' adicionado ao pedido'); atualizar();
+  const it=itemCatalogo(k); if(!it) return;            // preço e nome sempre do catálogo
+  if(i){ if(i.q>=QTD_MAX){toast('Quantidade máxima atingida');return} i.q++; }
+  else carrinho.push({k,n:it.n,p:it.p,q:1});
+  toast(it.n+' adicionado ao pedido'); atualizar();
 }
+function idxDe(k){return carrinho.findIndex(x=>x.k===k)}
+function menosI(i){const it=carrinho[i]; if(it) menos(it.k)}
+function editarI(i){const it=carrinho[i]; if(it) editarItem(it.k)}
 function menos(k){
   const i=carrinho.find(x=>x.k===k); if(!i)return;
   i.q--; if(i.q<=0)carrinho=carrinho.filter(x=>x!==i); atualizar();
@@ -723,7 +764,7 @@ function confirmarMontagem(){
   }else{
     const k=mont.k+'|'+mont.sab[0];
     const i=carrinho.find(x=>x.k===k);
-    if(i)i.q++; else carrinho.push({k,n:mont.n,p:mont.p,q:1,det:'Sabor: '+mont.sab[0]});
+    if(i){ if(i.q<QTD_MAX) i.q++; } else { const v=normalizar({k,q:1}); if(v) carrinho.push(v); }
     toast(mont.n+' adicionado ao pedido');
   }
   fecharModal('m-montar'); atualizar();
@@ -753,7 +794,9 @@ function copiarPix(){
 }
 // dados salvos do cliente
 (function(){
-  const c=store.get('gell_cliente',{});
+  const c0=store.get('gell_cliente',{}), c={};
+  if(c0&&typeof c0==='object'){c.nome=limpa(c0.nome,60);c.end=limpa(c0.end,120);c.bairro=limpa(c0.bairro,60);c.ref=limpa(c0.ref,120);
+    c.pag=['Pix','Cartão (crédito/débito)','Dinheiro'].includes(c0.pag)?c0.pag:'';c.entrega=c0.entrega==='Retirada'?'Retirada':(c0.entrega?'Delivery':'');}
   if(c.nome)$('f-nome').value=c.nome;
   if(c.end)$('f-end').value=c.end;
   if(c.bairro)$('f-bairro').value=c.bairro;
@@ -765,16 +808,31 @@ function copiarPix(){
 function abrirPedido(){renderPedido();status();$('m-pedido').classList.add('on')}
 function renderPedido(){
   if(!carrinho.length){fecharModal('m-pedido');return}
-  $('ped-itens').innerHTML = carrinho.map(i=>`<div class="linha-ped"><div class="lp-tx"><b>${i.q}× ${esc(i.n)}</b>${i.det?`<small>${esc(i.det)}</small>`:''}</div><div class="lp-p">${R(i.p*i.q)}</div><div class="lp-acoes">${i.cfg?`<button class="lp-edit" onclick="editarItem('${i.k}')">Editar</button>`:''}<button class="lp-menos" onclick="menos('${i.k}')" aria-label="Remover">${ic('menos')}</button></div></div>`).join('');
+  $('ped-itens').innerHTML = carrinho.map((i,n)=>`<div class="linha-ped"><div class="lp-tx"><b>${i.q}× ${esc(i.n)}</b>${i.det?`<small>${esc(i.det)}</small>`:''}</div><div class="lp-p">${R(i.p*i.q)}</div><div class="lp-acoes">${i.cfg?`<button class="lp-edit" onclick="editarI(${n})">Editar</button>`:''}<button class="lp-menos" onclick="menosI(${n})" aria-label="Remover">${ic('menos')}</button></div></div>`).join('');
   $('ped-total').textContent=R(carrinho.reduce((a,b)=>a+b.q*b.p,0));
 }
 function editarItem(k){abrirMontar(null,k)}
+function esquecerDados(){
+  try{localStorage.removeItem('gell_cliente')}catch(e){}
+  ['f-nome','f-end','f-bairro','f-ref','f-troco','f-obs'].forEach(id=>$(id).value='');
+  toast('Dados apagados deste aparelho');
+}
+/* Segurança: remove quebras de linha, marcações do WhatsApp (* _ ~ `) e caracteres invisíveis
+   para impedir que o cliente forje linhas como "Total" ou "Pago" dentro da mensagem. */
+function limpa(v,max){
+  return String(v||'').normalize('NFC')
+    .replace(/[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g,' ')
+    .replace(/[*_~`]/g,'').replace(/\s+/g,' ').trim().slice(0,max);
+}
 function enviarPedido(){
-  const nome=$('f-nome').value.trim(), end=$('f-end').value.trim(), bairro=$('f-bairro').value.trim(), ref=$('f-ref').value.trim();
+  carrinho = validarCarrinho(carrinho); atualizar();
+  if(!carrinho.length){toast('Seu pedido está vazio');return}
+  const nome=limpa($('f-nome').value,60), end=limpa($('f-end').value,120), bairro=limpa($('f-bairro').value,60), ref=limpa($('f-ref').value,120);
   if(!nome){toast('Informe seu nome');$('f-nome').focus();return}
   if(entrega==='Delivery'&&!end){toast('Informe o endereço de entrega');$('f-end').focus();return}
   if(entrega==='Delivery'&&!bairro){toast('Informe o bairro');$('f-bairro').focus();return}
   store.set('gell_cliente',{nome,end,bairro,ref,pag:$('f-pag').value,entrega});
+  entrega = entrega==='Retirada'?'Retirada':'Delivery';
   const total=carrinho.reduce((a,b)=>a+b.q*b.p,0);
   let m=`*Pedido – Gellatu's*\n\n`;
   carrinho.forEach(i=>{m+=`${i.q}x ${i.n} — ${R(i.p*i.q)}\n`; if(i.det) m+=`   _${i.det}_\n`;});
@@ -785,13 +843,15 @@ function enviarPedido(){
     m+=`*Endereço:* ${end}\n*Bairro:* ${bairro}\n`;
     if(ref) m+=`*Referência:* ${ref}\n`;
   }
-  m+=`*Pagamento:* ${$('f-pag').value}`;
-  if($('f-pag').value==='Dinheiro'&&$('f-troco').value.trim()) m+=` (troco para R$ ${$('f-troco').value.trim()})`;
+  m+=`*Pagamento:* ${['Pix','Cartão (crédito/débito)','Dinheiro'].includes($('f-pag').value)?$('f-pag').value:'A combinar'}`;
+  const pag=['Pix','Cartão (crédito/débito)','Dinheiro'].includes($('f-pag').value)?$('f-pag').value:'A combinar';
+  const troco=$('f-troco').value.replace(/[^\d,.]/g,'').slice(0,10);
+  if(pag==='Dinheiro'&&troco) m+=` (troco para R$ ${troco})`;
   m+='\n';
-  if($('f-obs').value.trim()) m+=`*Observações:* ${$('f-obs').value.trim()}\n`;
+  const obs=limpa($('f-obs').value,200); if(obs) m+=`*Observações:* ${obs}\n`;
   if(!estado.aberto) m+=`\n_Pedido enviado fora do horário de atendimento._\n`;
   track('pedido-enviado');
-  window.open('https://wa.me/'+ZAP+'?text='+encodeURIComponent(m),'_blank');
+  window.open('https://wa.me/'+ZAP+'?text='+encodeURIComponent(m),'_blank','noopener');
 }
 
 atualizar();
